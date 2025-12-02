@@ -25,3 +25,7 @@ run-data
 
 repo
 .vscode
+
+net/
+assets/
+libs/
