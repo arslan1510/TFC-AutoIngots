@@ -1,27 +1,36 @@
+# TFC AutoIngots
 
-Installation information
-=======
+Automatically generates TerraFirmaCraft ingot pile textures for ingots from any mod.
 
-This template repository can be directly cloned to get you started with a new
-mod. Simply create a new repository cloned from this one, by following the
-instructions at [github](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
+## Features
 
-Once you have your clone, simply open the repository in the IDE of your choice. The usual recommendation for an IDE is either IntelliJ IDEA or Eclipse.
+- Automatically detects ingots from any mod
+- Generates TFC-style ingot pile textures using color extraction
+- Zero configuration required
 
-> **Note**: For Eclipse, use tasks in `Launch Group` instead of ones founds in `Java Application`. A preparation task must run before launching the game. NeoGradle uses launch groups to do these subsequently.
+## Requirements
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-{this does not affect your code} and then start the process again.
+- Minecraft 1.21.1
+- NeoForge 21.1.0+
+- TerraFirmaCraft 4.0.0+ (required)
 
-Mapping Names:
-============
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
+## Installation
 
-Additional Resources: 
-==========
-Community Documentation: https://docs.neoforged.net/  
-NeoForged Discord: https://discord.neoforged.net/
+1. Place the mod JAR in your `mods` folder
+2. Launch the game - textures generate automatically
+3. Enable `tfcautoingots_generated` resource pack in Options > Resource Packs
+4. Restart the game
+
+## How It Works
+
+The mod scans for ingots tagged with `c:ingots` or items containing "ingot" in their name. It extracts the metal name from the item ID (e.g., `tfmg:lead_ingot` → `lead`) and generates a recolored version of TFC's ingot pile texture. Textures are saved to `resourcepacks/tfcautoingots_generated/` and must be enabled manually.
+
+## Building
+
+```bash
+./gradlew build
+```
+
+## License
+
+MIT

@@ -20,8 +20,9 @@ group = mod_group_id
 
 repositories {
     mavenLocal()
-    flatDir {
-        dirs 'libs'
+    maven {
+        name = "CurseMaven"
+        url = "https://cursemaven.com"
     }
 }
 
@@ -113,8 +114,10 @@ dependencies {
     // The group id is ignored when searching -- in this case, it is "blank"
     // implementation "blank:coolmod-${mc_version}:${coolmod_version}"
 
-    // TFC dependency - using local jar file
-    implementation files("libs/TerraFirmaCraft-NeoForge-1.21.1-4.0.11-beta.jar")
+    // TFC dependency - using CurseForge Maven
+    // Find the file ID from: https://www.curseforge.com/minecraft/mc-mods/terrafirmacraft
+    // Click on the version you want, then copy the file ID from the URL or file details
+    implementation "curse.maven:terrafirmacraft-302973:${tfc_file_id}"
 
     // Example project dependency using a sister or child project:
     // implementation project(":myproject")

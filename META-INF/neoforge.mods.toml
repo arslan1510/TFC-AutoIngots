@@ -41,7 +41,7 @@ displayName="TFC AutoIngots" #mandatory
 #credits="" #optional
 
 # A text field displayed in the mod UI
-authors="aleph" #optional
+authors="concinnity" #optional
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''Automatically convert any mod's ingots to placeable TFC-style ingot piles with auto-generated textures.'''
