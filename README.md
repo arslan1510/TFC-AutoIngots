@@ -17,13 +17,11 @@ Automatically generates TerraFirmaCraft ingot pile textures for ingots from any 
 ## Installation
 
 1. Place the mod JAR in your `mods` folder
-2. Launch the game - textures generate automatically
-3. Enable `tfcautoingots_generated` resource pack in Options > Resource Packs
-4. Restart the game
+2. Launch the game - textures generate automatically at runtime
 
 ## How It Works
 
-The mod scans for ingots tagged with `c:ingots` or items containing "ingot" in their name. It extracts the metal name from the item ID (e.g., `tfmg:lead_ingot` → `lead`) and generates a recolored version of TFC's ingot pile texture. Textures are saved to `resourcepacks/tfcautoingots_generated/` and must be enabled manually.
+The mod scans for ingots tagged with `c:ingots` or items containing "ingot" in their name. It extracts the metal name from the item ID (e.g., `tfmg:lead_ingot` → `lead`) and generates a recolored version of TFC's ingot pile texture. Textures are generated in-memory at runtime and provided via a dynamic resource pack, so no manual resource pack selection is required.
 
 ## Building
 

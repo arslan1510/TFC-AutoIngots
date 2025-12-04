@@ -4,24 +4,24 @@ import com.tfcautoingots.TFCAutoIngots;
 import com.tfcautoingots.texture.IngotTextureGenerator;
 import com.tfcautoingots.util.TagExtractor;
 
-import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.PackSelectionConfig;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.event.AddPackFindersEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
-import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
- * Handles texture generation for ingots.
- * Generates textures early and on-demand to prevent caching issues.
+ * Handles texture generation for ingots and registration of the dynamic resource pack.
  */
 @EventBusSubscriber(modid = TFCAutoIngots.MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class TextureGenerationHandler {
@@ -30,45 +30,50 @@ public class TextureGenerationHandler {
     @SubscribeEvent
     public static void onAddPackFinders(AddPackFindersEvent event) {
         if (event.getPackType() == PackType.CLIENT_RESOURCES) {
-            // Initialize resource pack directory early
-            try {
-                Path gameDir = FMLPaths.GAMEDIR.get();
-                IngotTextureGenerator.initResourcePack(gameDir);
-                TFCAutoIngots.getLogger().info("Initialized resource pack directory for texture generation");
-            } catch (Exception e) {
-                TFCAutoIngots.getLogger().warn("Could not initialize resource pack during AddPackFindersEvent: {}", e.getMessage());
-            }
+            PackLocationInfo locationInfo = new PackLocationInfo(
+                "tfcautoingots_generated",
+                Component.literal("TFC AutoIngots Generated"),
+                PackSource.BUILT_IN,
+                Optional.empty()
+            );
+            
+            Pack.ResourcesSupplier resourcesSupplier = DynamicIngotTexturePack.createResourcesSupplier();
+            
+            event.addRepositorySource((profileAdder) -> {
+                try {
+                    PackSelectionConfig selectionConfig = new PackSelectionConfig(
+                        true,  // required
+                        Pack.Position.TOP,  // defaultPosition
+                        true   // fixedPosition
+                    );
+                    
+                    Pack pack = Pack.readMetaAndCreate(
+                        locationInfo,
+                        resourcesSupplier,
+                        PackType.CLIENT_RESOURCES,
+                        selectionConfig
+                    );
+                    profileAdder.accept(pack);
+                } catch (Exception e) {
+                    TFCAutoIngots.getLogger().error("Failed to create dynamic pack: {}", e.getMessage(), e);
+                }
+            });
+            TFCAutoIngots.getLogger().info("Registered dynamic resource pack for ingot textures");
         }
     }
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
-            generateAllTextures();
+            if (!texturesGenerated) {
+                generateAllTextures();
+            }
         });
     }
 
     /**
-     * Generate textures on-demand when player interacts with ingots.
-     * This ensures textures exist before TFC tries to render them.
+     * Generate textures for all discovered ingots.
      */
-    @EventBusSubscriber(modid = TFCAutoIngots.MODID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
-    public static class IngotInteractionHandler {
-        @SubscribeEvent
-        public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-            if (event.getLevel().isClientSide()) {
-                ItemStack stack = event.getEntity().getMainHandItem();
-                if (!stack.isEmpty()) {
-                    String metalName = TagExtractor.getMetalName(stack.getItem());
-                    if (metalName != null && !metalName.isEmpty()) {
-                        // Generate texture on-demand if not already generated
-                        IngotTextureGenerator.generateAndSaveTexture(metalName, stack.getItem());
-                    }
-                }
-            }
-        }
-    }
-
     private static void generateAllTextures() {
         if (texturesGenerated) {
             return;
@@ -77,49 +82,52 @@ public class TextureGenerationHandler {
         TFCAutoIngots.getLogger().info("Generating ingot textures...");
         
         try {
-            // Ensure resource pack is initialized
-            Path gameDir = Minecraft.getInstance().gameDirectory.toPath();
-            IngotTextureGenerator.initResourcePack(gameDir);
-            
-            // Generate textures for all known ingots
-            Map<String, Item> metalToIngot = TagExtractor.extractMetalNames();
+            Map<String, net.minecraft.world.item.Item> metalToIngot = discoverMetals();
             TFCAutoIngots.getLogger().info("Found {} unique metals", metalToIngot.size());
             
-            int successCount = 0;
-            for (Map.Entry<String, Item> entry : metalToIngot.entrySet()) {
-                if (IngotTextureGenerator.generateAndSaveTexture(entry.getKey(), entry.getValue())) {
-                    successCount++;
-                }
-            }
-            
-            TFCAutoIngots.getLogger().info("Generated textures for {}/{} metals", successCount, metalToIngot.size());
+            int successCount = generateBatch(metalToIngot);
             texturesGenerated = true;
             
-            Path packPath = IngotTextureGenerator.getResourcePackPath();
-            if (packPath != null && successCount > 0) {
-                // Verify textures exist
-                Path texturesDir = packPath.resolve("assets/tfc/textures/block/metal/smooth");
-                if (texturesDir.toFile().exists()) {
-                    long textureCount = 0;
-                    try {
-                        textureCount = java.nio.file.Files.list(texturesDir)
-                            .filter(p -> p.toString().endsWith(".png"))
-                            .count();
-                    } catch (Exception e) {
-                        // Ignore
-                    }
-                    
-                    TFCAutoIngots.getLogger().info("═══════════════════════════════════════════════════════");
-                    TFCAutoIngots.getLogger().info("TFC AutoIngots: Generated {} texture files", textureCount);
-                    TFCAutoIngots.getLogger().info("Textures saved to: {}", texturesDir);
-                    TFCAutoIngots.getLogger().info("═══════════════════════════════════════════════════════");
-                }
-            } else if (successCount == 0) {
-                TFCAutoIngots.getLogger().warn("No textures were generated! Check logs above for errors.");
-            }
+            logResults(successCount, metalToIngot.size());
         } catch (Exception e) {
-            TFCAutoIngots.getLogger().error("Error generating textures: {}", e.getMessage());
-            e.printStackTrace();
+            TFCAutoIngots.getLogger().error("Error generating textures: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Discover all ingot metals from registered items.
+     */
+    private static Map<String, net.minecraft.world.item.Item> discoverMetals() {
+        return TagExtractor.extractMetalNames();
+    }
+
+    /**
+     * Generate textures for a batch of metals.
+     */
+    private static int generateBatch(Map<String, net.minecraft.world.item.Item> metalToIngot) {
+        int successCount = 0;
+        for (Map.Entry<String, net.minecraft.world.item.Item> entry : metalToIngot.entrySet()) {
+            if (IngotTextureGenerator.generateTexture(entry.getKey(), entry.getValue())) {
+                successCount++;
+            }
+        }
+        return successCount;
+    }
+
+    /**
+     * Log generation results.
+     */
+    private static void logResults(int successCount, int totalCount) {
+        TFCAutoIngots.getLogger().info("Generated textures for {}/{} metals", successCount, totalCount);
+        
+        Set<String> registeredMetals = DynamicIngotTexturePack.getRegisteredMetals();
+        if (registeredMetals.size() > 0) {
+            TFCAutoIngots.getLogger().info("═══════════════════════════════════════════════════════");
+            TFCAutoIngots.getLogger().info("TFC AutoIngots: Generated {} texture files", registeredMetals.size());
+            TFCAutoIngots.getLogger().info("Textures are available at runtime - no resource pack selection needed");
+            TFCAutoIngots.getLogger().info("═══════════════════════════════════════════════════════");
+        } else {
+            TFCAutoIngots.getLogger().warn("No textures were generated! Check logs above for errors.");
         }
     }
 }
